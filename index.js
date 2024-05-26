@@ -3,7 +3,8 @@ const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken')
 const cors = require('cors');
-require('dotenv').config()
+require('dotenv').config();
+const stripe = require('stripe')(process.env.Stripe_Secret_Kay)
 const port = process.env.PORT || 5000;
 
 //bed273fce0e18a1a1eca3492a3133d5907a2483f3447948c85217c5794b1f400958f7c4e4a94d9525f0bfa61978896c8774ffd49598482e7a6afe42e4bf52d09
@@ -41,6 +42,7 @@ async function run() {
     const UsersCollections = client.db('bistroDB').collection('users');
     const reviewsCollections = client.db('bistroDB').collection('reviews');
     const CartCollections = client.db('bistroDB').collection('carts');
+    const paymentsCollections = client.db('bistroDB').collection('payments');
 
 
     // middleWare 
@@ -162,6 +164,34 @@ async function run() {
       const query  = {_id: new ObjectId(id)}
       const result = await CartCollections.deleteOne(query);
       res.send(result)
+    })
+    // payment intent
+    app.post('/create-payment-intent', async(req,res) =>{
+      const {price} = req.body;
+      const amount = parseInt(price * 100);
+      console.log(amount,'amount inside the intent')
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card']
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      })
+    }) 
+
+    app.post('/payments', async(req, res) =>{
+      const payment = req.body;
+      const paymentResult = await paymentsCollections.insertOne(payment);
+
+      // carefully delete each item from the cart 
+      console.log('payment info', payment);
+      const query ={_id: {
+        $in: payment.cartIds.map(id => new ObjectId(id))
+      }};
+      const deleteResult = await CartCollections.deleteMany(query)
+      res.send({paymentResult, deleteResult});
     })
 
     app.get('/menu', async(req, res)=>{
