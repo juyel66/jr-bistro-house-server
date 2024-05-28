@@ -231,7 +231,92 @@ async function run() {
         orders,
         revenue
       })
+    });
+
+
+
+    app.get('/order-stats', async(req, res) =>{
+      // const result = await paymentsCollections.aggregate([
+      //   {
+      //     $unwind: '$menuItemIds'
+      //   },
+        // {
+        //   $lookup: {
+        //     from: 'menu',
+        //     localField: 'menuItemIds',
+        //     foreignField: '_id',
+        //     as: 'menuItems'
+        //   }
+        // },
+        // {
+        //   $unwind: '$menuItemIds'
+        // },
+        // {
+        //   $group: {
+        //     _id: '$menuItemIds.category',
+        //     quantity: { $sum: 1},
+        //     revenue: {$sum: '$menuItemIds.price'}
+        //   }
+        // },
+
+
+        // {
+        //   $project: {
+        //     _id: 0,
+        //     category: '$_id',
+        //     quantity: '$quantity',
+        //     revenue: '$revenue'
+        //   }
+        // }
+
+      // ]).toArray();
+
+      const result = await paymentsCollections.aggregate([
+        {
+          $unwind: '$menuItemIds'
+        },
+        {
+          $addFields: {
+              menuItemId: {
+                  $toObjectId: '$menuItemIds'
+              }
+          }
+      },
+        {
+          $lookup: {
+            from: 'menu',
+            localField: 'menuItemId',
+            foreignField: '_id',
+            as: 'menuItems'
+          }
+        },
+        {
+          $unwind: '$menuItems'
+        },
+        {
+          $group: {
+            _id: '$menuItems.category',
+            quantity: { $sum: 1 },
+            revenue: { $sum: '$menuItems.price' }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            category: '$_id',
+            quantity: '$quantity',
+            revenue: '$revenue'
+          }
+        }
+      ]).toArray();
+
+      res.send(result)
     })
+
+    
+
+
+
 
     app.get('/menu', async(req, res)=>{
         const result = await menuCollections.find().toArray();
